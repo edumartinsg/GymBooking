@@ -1,44 +1,31 @@
-import { FastifyReply, FastifyRequest } from "fastify"
-import { z } from "zod"
-import { InvalidCredentialsError } from "@/use-cases/errors/invalid-credentials-error"
-import { makeAuthenticateUseCase } from "@/use-cases/factories/make-authenticate-use-case"
+import fastifyJwt from "@fastify/jwt"
+import fastify from "fastify"
+import { ZodError } from "zod"
+import { env } from "@/env"
+import { usersRoutes } from "@/http/controllers/users/routes"
+import { gymsRoutes } from "@/http/controllers/gyms/routes"
 
-export async function authenticate(
-  request: FastifyRequest,
-  reply: FastifyReply
-) {
-  const authenticateBodySchema = z.object({
-    email: z.string().email(),
-    password: z.string().min(6),
-  })
+export const app = fastify()
 
-  const { email, password } = authenticateBodySchema.parse(request.body)
+app.register(fastifyJwt, {
+  secret: env.JWT_SECRET,
+})
 
-  try {
-    const authenticateUseCase = makeAuthenticateUseCase()
+app.register(usersRoutes)
+app.register(gymsRoutes)
 
-    const { user } = await authenticateUseCase.execute({
-      email,
-      password,
-    })
-
-    const token = await reply.jwtSign(
-      {},
-      {
-        sign: {
-          sub: user.id,
-        },
-      }
-    )
-
-    return reply.status(200).send({
-      token,
-    })
-  } catch (err) {
-    if (err instanceof InvalidCredentialsError) {
-      return reply.status(400).send({ message: err.message })
-    }
-
-    throw err
+app.setErrorHandler((error, _, reply) => {
+  if (error instanceof ZodError) {
+    return reply
+      .status(400)
+      .send({ message: "Validation error.", issues: error.format() })
   }
-}
+
+  if (env.NODE_ENV !== "production") {
+    console.error(error)
+  } else {
+    // TODO: Here we should log to a external tool like DataDog/NewRelic/Sentry
+  }
+
+  return reply.status(500).send({ message: "Internal server error." })
+})

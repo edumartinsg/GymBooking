@@ -23,7 +23,9 @@ export async function authenticate(
     })
 
     const token = await reply.jwtSign(
-      {},
+      {
+        role: user.role,
+      },
       {
         sign: {
           sub: user.id,
@@ -32,7 +34,9 @@ export async function authenticate(
     )
 
     const refreshToken = await reply.jwtSign(
-      {},
+      {
+        role: user.role,
+      },
       {
         sign: {
           sub: user.id,
@@ -43,10 +47,10 @@ export async function authenticate(
 
     return reply
       .setCookie("refreshToken", refreshToken, {
-        path: "/", //ALL Routes can Access
-        secure: true, //HTTPS Encryption
-        sameSite: true, //Same Site Policy
-        httpOnly: true, //Prevent XSS Attacks
+        path: "/",
+        secure: true,
+        sameSite: true,
+        httpOnly: true,
       })
       .status(200)
       .send({
